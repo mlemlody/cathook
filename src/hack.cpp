@@ -108,16 +108,6 @@ void hack::ExecuteCommand(const std::string &command)
     hack::command_stack().push(command);
 }
 
-        unsigned int crc = 544230355;
-        uintptr_t g_SendTableCRC_ptrptr = gSignatures.GetEngineSignature("C7 05 ? ? ? ? ? ? ? ? A3 ? ? ? ? 83 C4") + 0x2;
-
-        BytePatch::mprotectAddr(g_SendTableCRC_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
-        BytePatch::mprotectAddr(*(uintptr_t *) g_SendTableCRC_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
-        BytePatch::mprotectAddr(**(uintptr_t **) g_SendTableCRC_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
-
-        unsigned int *g_SendTableCRC_ptr = *((unsigned int **) g_SendTableCRC_ptrptr);
-        *g_SendTableCRC_ptr      = crc;
-
 #if ENABLE_LOGGING
 
 std::string getFileName(std::string filePath)
@@ -349,6 +339,20 @@ free(logname);*/
     logging::Info("Early Initializer stack done");
     sharedobj::LoadAllSharedObjects();
     CreateInterfaces();
+    
+    // Patch SendTable CRC
+    {
+        unsigned int crc = 544230355;
+        uintptr_t g_SendTableCRC_ptrptr = gSignatures.GetEngineSignature("C7 05 ? ? ? ? ? ? ? ? A3 ? ? ? ? 83 C4") + 0x2;
+
+        BytePatch::mprotectAddr(g_SendTableCRC_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
+        BytePatch::mprotectAddr(*(uintptr_t *) g_SendTableCRC_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
+        BytePatch::mprotectAddr(**(uintptr_t **) g_SendTableCRC_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
+
+        unsigned int *g_SendTableCRC_ptr = *((unsigned int **) g_SendTableCRC_ptrptr);
+        *g_SendTableCRC_ptr = crc;
+    }
+    
     CDumper dumper;
     dumper.SaveDump();
     logging::Info("Is TF2? %d", IsTF2());
