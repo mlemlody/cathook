@@ -365,6 +365,15 @@ free(logname);*/
     static BytePatch patch2(gSignatures.GetEngineSignature, "E8 ? ? ? ? 8B 45 ? 83 C4 ? 5B 5E 5F 5D C3 EB", 0x0, { 0xB8, 0xD3, 0x4B, 0x70, 0x20, 0x90, 0x90, 0x90 });
     patch2.Patch();
     
+    static BytePatch patch_copyentity(gSignatures.GetEngineSignature, "0F 84 ? ? ? ? 8B 45 ? 85 C0 0F 84 ? ? ? ? 8B 10", 0x0, { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 });
+    patch_copyentity.Patch();
+    
+    static BytePatch patch_entity_error(gSignatures.GetEngineSignature, "68 ? ? ? ? E8 ? ? ? ? 83 C4 ? 5B 5E 5F 5D C3", 0x0, { 0x83, 0xC4, 0x04, 0x5B, 0x5E, 0x5F, 0x5D, 0xC3 });
+    patch_entity_error.Patch();
+    
+    static BytePatch patch_entity_check(gSignatures.GetEngineSignature, "74 ? 8B 40 ? 85 C0 74 ? 8B 10 8B 52", 0x0, { 0xEB });
+    patch_entity_check.Patch();
+    
 
     // class tables bypass
     unsigned int crc = 544230355;
