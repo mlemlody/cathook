@@ -331,11 +331,11 @@ free(logname);*/
         *g_SendTableCRC_ptr = crc;
 
 
-        static BytePatch patch(gSignatures.GetEngineSignature, "E8 ? ? ? ? 8B 45 ? 83 C4 ? 5B 5E 5F 5D C3 EB", 0x0, { 0xB8, 0xD3, 0x4B, 0x70, 0x20, 0x90, 0x90, 0x90 });
-patch.Patch();
+        static BytePatch patch2(gSignatures.GetEngineSignature, "E8 ? ? ? ? 8B 45 ? 83 C4 ? 5B 5E 5F 5D C3 EB", 0x0, { 0xB8, 0xD3, 0x4B, 0x70, 0x20, 0x90, 0x90, 0x90 });
+        patch2.Patch();
 
-static BytePatch patch(gSignatures.GetEngineSignature, "74 ? 8B 03 89 1C 24 C7 44 24 ? ? ? ? ? FF 50 ? 83 C4", 0x0, { 0xEB  });
-patch.Patch();
+        static BytePatch patch3(gSignatures.GetEngineSignature, "74 ? 8B 03 89 1C 24 C7 44 24 ? ? ? ? ? FF 50 ? 83 C4", 0x0, { 0xEB  });
+        patch3.Patch();
     
 
     // Remove intro video which also causes some crashes
