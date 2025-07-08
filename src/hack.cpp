@@ -361,6 +361,9 @@ free(logname);*/
 #if ENABLE_TEXTMODE
     static BytePatch patch(gSignatures.GetEngineSignature, "74 ? 89 5C 24 ? 8D 9D ? ? ? ? 89 74 24", 0, { 0x71 });
     patch.Patch();
+
+    static BytePatch patch2(gSignatures.GetEngineSignature, "E8 ? ? ? ? 8B 45 ? 83 C4 ? 5B 5E 5F 5D C3 EB", 0x0, { 0xB8, 0xD3, 0x4B, 0x70, 0x20, 0x90, 0x90, 0x90 });
+    patch2.Patch();
     
 
     // class tables bypass
