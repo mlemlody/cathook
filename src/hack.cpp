@@ -321,18 +321,30 @@ free(logname);*/
     patch.Patch();
     
 
-    unsigned int spoofed_crc = 544230355;
-    uintptr_t send_table_crc_ptrptr = gSignatures.GetEngineSignature("C7 05 ? ? ? ? ? ? ? ? A3 ? ? ? ? 83 C4") + 0x2;
+    // class tables bypass
+    unsigned int crc = 544230355;
+    uintptr_t g_SendTableCRC_ptrptr = gSignatures.GetEngineSignature("C7 05 ? ? ? ? ? ? ? ? A3 ? ? ? ? 83 C4") + 0x2;
 
-    BytePatch::mprotectAddr(send_table_crc_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
-    BytePatch::mprotectAddr(*(uintptr_t *) send_table_crc_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
-    BytePatch::mprotectAddr(**(uintptr_t **) send_table_crc_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
+    BytePatch::mprotectAddr(g_SendTableCRC_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
+    BytePatch::mprotectAddr(*(uintptr_t *) g_SendTableCRC_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
+    BytePatch::mprotectAddr(**(uintptr_t **) g_SendTableCRC_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
 
-    unsigned int *send_table_crc_ptr = *((unsigned int **) send_table_crc_ptrptr);
-    *send_table_crc_ptr = spoofed_crc;
+    unsigned int *g_SendTableCRC_ptr = *((unsigned int **) g_SendTableCRC_ptrptr);
+    *g_SendTableCRC_ptr      = crc;
 
-    static BytePatch crc_validation_bypass(gSignatures.GetEngineSignature, "74 ? 8B 03 89 1C 24 C7 44 24 ? ? ? ? ? FF 50 ? 83 C4", 0x0, { 0xEB });
-    crc_validation_bypass.Patch();
+    static BytePatch patch2(gSignatures.GetEngineSignature, "74 ? 8B 03 89 1C 24 C7 44 24 ? ? ? ? ? FF 50 ? 83 C4", 0x0, { 0xEB  });
+    patch2.Patch();
+
+    static BytePatch patch3(gSignatures.GetEngineSignature, "8B 75 ? 84 DB 0F 85", 0x0, { 0xE9, 0xDF, 0x00, 0x00, 0x00  });
+    patch3.Patch();
+
+    static BytePatch patch4(gSignatures.GetEngineSignature, "0F 84 ? ? ? ? A1 ? ? ? ? 8B 78 ? 85 FF 74 ? C7 04 24", 0x0, { 0xE9, 0xE6, 0xFE, 0xFF });
+    patch4.Patch();
+
+    static BytePatch patch5(gSignatures.GetEngineSignature, "E8 ? ? ? ? 8B 45 ? 83 C4 ? 5B 5E 5F 5D C3 EB", 0x0, { 0xB8, 0xD3, 0x4B, 0x70, 0x20, 0x90, 0x90, 0x90 });
+    patch5.Patch();
+
+    
 
     // Remove intro video which also causes some crashes
     static BytePatch patch_intro_video(gSignatures.GetEngineSignature, "55 89 E5 57 56 53 83 EC 5C 8B 5D ? 8B 55", 0x9, { 0x83, 0xc4, 0x5c, 0x5b, 0x5e, 0x5f, 0x5d, 0xc3 });
