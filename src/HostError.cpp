@@ -8,7 +8,7 @@ static DetourHook host_error_detour;
 
 extern "C" void __attribute__((cdecl)) Host_Error_hook(const char *pInMessage, ...)
 {
-    logging::Info("Suppressed Host_Error: %s", pInMessage ? pInMessage : "(null)");
+    (void)pInMessage;
 }
 
 static InitRoutine host_error_init([]() {
