@@ -1,5 +1,6 @@
 #include "common.hpp"
 #include "DetourHook.hpp"
+#include <cstdio>
 
 // Hook CL_ParsePacketEntities (engine.so) to log state before parsing.
 // Signature provided: "C7 04 24 ? ? ? ? E8"
@@ -32,6 +33,14 @@ static void log_before(int a1, int a2)
 
     // Print exactly as requested (pointer for a1, ints for others)
     logging::Info("[CL_ParsePacketEntities] BEFORE: a1=%p a2=%d a3=%d a4=%d a5=%d a6=%d", (void *) a1, v_a2, v_a3, v_a4, v_a5, v_a6);
+
+    // Also append to a file on disk for persistence
+    if (FILE *f = std::fopen("/tmp/cathook-packetentities.txt", "a"))
+    {
+        std::fprintf(f, "[CL_ParsePacketEntities] BEFORE: a1=%p a2=%d a3=%d a4=%d a5=%d a6=%d\n",
+                     (void *) a1, v_a2, v_a3, v_a4, v_a5, v_a6);
+        std::fclose(f);
+    }
 }
 
 static int hook_impl(int a1, int a2)
