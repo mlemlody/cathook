@@ -1,6 +1,7 @@
 #include "common.hpp"
 #include "DetourHook.hpp"
 #include <cstdio>
+#include <cstdint>
 
 // Hook CL_ParsePacketEntities (engine.so) to log state before parsing.
 // Signature provided: "C7 04 24 ? ? ? ? E8"
@@ -55,13 +56,17 @@ static int hook_impl(int a1, int a2)
 }
 
 static InitRoutine init([]() {
-    // Engine function signature (AOB) to locate CL_ParsePacketEntities
-    static uintptr_t addr = gSignatures.GetEngineSignature("C7 04 24 ? ? ? ? E8");
-    if (!addr)
+    // Engine function signature (AOB) to locate CL_ParsePacketEntities entry (prologue pattern).
+    static uintptr_t site = gSignatures.GetEngineSignature(
+        "55 89 E5 57 56 53 83 EC ? C7 45 ? ? ? ? ? A1 ? ? ? ? C7 45 ? ? ? ? ? 8B 75 ? 8B 5D ? 85 C0 0F 84 ? ? ? ? 8D 55 ? 89 04 24 89 54 24 ? C7 44 24 ? ? ? ? ? C7 44 24 ? ? ? ? ? C7 44 24 ? ? ? ? ? C7 44 24 ? ? ? ? ? C7 44 24 ? ? ? ? ? C7 44 24 ? ? ? ? ? C7 44 24 ? ? ? ? ? C7 44 24 ? ? ? ? ? C7 44 24 ? ? ? ? ? C7 44 24 ? ? ? ? ? FF 50 ? A1 ? ? ? ? 8B 55 ? 89 45 ? 8B 45 ? 89 55 ? 89 45 ? A1 ? ? ? ? 85 C0 0F 85 ? ? ? ? 8B 4B ? C6 45 ? ? 85 C9 0F 84 ? ? ? ? 8B 43 ? 8D 50 ? 81 FA ? ? ? ? 0F 8F ? ? ? ? 89 D0 83 E2 ? C1 F8 ? 8D 3C 85 ? ? ? ? 89 45 ? 8D 4C 39 ? 8B 01 29 F9 23 04 95 ? ? ? ? 89 C2 75 ? 8B 45 ? 8D B4 26 ? ? ? ? 83 C0 ? 83 F8 ? 0F 84 ? ? ? ? 8B 14 81 85 D2 74 ? 89 45 ? 8B 45 ? 0F B6 CA C1 E0 ? 85 C9"
+    );
+    if (!site)
     {
         logging::Info("ParsePacketEntities: engine signature not found; hook disabled");
         return;
     }
+    uintptr_t addr = site;
+
     g_detour.Init(addr, (void *) hook_impl);
     logging::Info("ParsePacketEntities: hook installed at 0x%p", (void *) addr);
 
