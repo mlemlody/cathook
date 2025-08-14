@@ -218,49 +218,49 @@ install_dependencies
 ensure_pv_installed
 PV_AVAILABLE=$?
 
-print_colored "blue" "Downloading TF2 files..."
-temp_dir=$(mktemp -d)
-wget --progress=bar:force:noscroll https://cdn.cathook.org/goyslop/tf32.zip -O "$temp_dir/tf32.zip" 2>&1 | stdbuf -o0 tr '\r' '\n' | grep -o '[0-9]*%'
+# print_colored "blue" "Downloading TF2 files..."
+# temp_dir=$(mktemp -d)
+# wget --progress=bar:force:noscroll https://cdn.cathook.org/goyslop/tf32.zip -O "$temp_dir/tf32.zip" 2>&1 | stdbuf -o0 tr '\r' '\n' | grep -o '[0-9]*%'
 
-if [ $? -ne 0 ]; then
-    print_colored "red" "Failed to download tf32.zip"
-    rm -rf "$temp_dir"
-    exit 1
-fi
+# if [ $? -ne 0 ]; then
+#     print_colored "red" "Failed to download tf32.zip"
+#     rm -rf "$temp_dir"
+#     exit 1
+# fi
 
-# Find TF2 directory
-tf2_dir=$(find_tf2_dir)
+# # Find TF2 directory
+# tf2_dir=$(find_tf2_dir)
 
-if [ -z "$tf2_dir" ]; then
-    echo "TF2 isn't installed, or couldn't find the installation directory."
-    echo "Please either install TF2 or manually specify the path."
-    echo "The path should look like: ~/.steam/steam/steamapps/common/Team Fortress 2/"
-    read -p "Enter TF2 path (or press Ctrl+C to cancel): " tf2_dir
+# if [ -z "$tf2_dir" ]; then
+#     echo "TF2 isn't installed, or couldn't find the installation directory."
+#     echo "Please either install TF2 or manually specify the path."
+#     echo "The path should look like: ~/.steam/steam/steamapps/common/Team Fortress 2/"
+#     read -p "Enter TF2 path (or press Ctrl+C to cancel): " tf2_dir
     
-    if [ ! -d "$tf2_dir" ]; then
-        print_colored "red" "Invalid directory!"
-        rm -rf "$temp_dir"
-        exit 1
-    fi
-fi
+#     if [ ! -d "$tf2_dir" ]; then
+#         print_colored "red" "Invalid directory!"
+#         rm -rf "$temp_dir"
+#         exit 1
+#     fi
+# fi
 
-print_colored "blue" "Found TF2 directory: $tf2_dir"
-print_colored "blue" "Extracting files..."
+# print_colored "blue" "Found TF2 directory: $tf2_dir"
+# print_colored "blue" "Extracting files..."
 
-# Use pv if available, otherwise use regular unzip
-if [ $PV_AVAILABLE -eq 0 ] && command -v pv >/dev/null 2>&1; then
-    unzip -o "$temp_dir/tf32.zip" -d "$tf2_dir" | pv -l -s $(unzip -l "$temp_dir/tf32.zip" | tail -n 1 | awk '{print $2}') > /dev/null
-else
-    unzip -o "$temp_dir/tf32.zip" -d "$tf2_dir"
-fi
+# # Use pv if available, otherwise use regular unzip
+# if [ $PV_AVAILABLE -eq 0 ] && command -v pv >/dev/null 2>&1; then
+#     unzip -o "$temp_dir/tf32.zip" -d "$tf2_dir" | pv -l -s $(unzip -l "$temp_dir/tf32.zip" | tail -n 1 | awk '{print $2}') > /dev/null
+# else
+#     unzip -o "$temp_dir/tf32.zip" -d "$tf2_dir"
+# fi
 
-if [ $? -eq 0 ]; then
-    print_colored "green" "Installation completed successfully!"
-    # Create Steam shortcut
-    create_steam_shortcut "$tf2_dir"
-else
-    print_colored "red" "Failed to extract files to TF2 directory!"
-fi
+# if [ $? -eq 0 ]; then
+#     print_colored "green" "Installation completed successfully!"
+#     # Create Steam shortcut
+#     create_steam_shortcut "$tf2_dir"
+# else
+#     print_colored "red" "Failed to extract files to TF2 directory!"
+# fi
 
-# Cleanup
-rm -rf "$temp_dir" 
+# # Cleanup
+# rm -rf "$temp_dir" 
