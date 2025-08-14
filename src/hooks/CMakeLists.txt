@@ -20,7 +20,8 @@ set(files "${CMAKE_CURRENT_LIST_DIR}/CanPacket.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/FireEventClientSide.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/IsPlayingTimeDemo.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/HookTools.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/SendDatagram.cpp")
+    "${CMAKE_CURRENT_LIST_DIR}/SendDatagram.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/ClassInfoEndClasses.cpp")
 target_sources(cathook PRIVATE ${files})
 
 if(EnableVisuals)
