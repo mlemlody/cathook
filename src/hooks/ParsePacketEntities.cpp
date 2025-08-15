@@ -13,8 +13,16 @@ namespace hooks::packetentities
 {
 using Fn_t = int (*)(int, int);
 static DetourHook g_detour;
-static bool g_disable = [](){
+// Keep translation disabled by default. Two env toggles exist:
+//  - CATHOOK_DISABLE_CLASSID_TRANSLATION: legacy kill-switch if set (non-empty and not '0').
+//  - CATHOOK_ENABLE_UNSAFE_PACKET_TRANSLATION: explicit opt-in to mutate packet data pre-parse.
+static bool g_disable_legacy = [](){
     if (const char* v = std::getenv("CATHOOK_DISABLE_CLASSID_TRANSLATION"))
+        return v[0] != '\0' && v[0] != '0';
+    return false;
+}();
+static bool g_enable_unsafe = [](){
+    if (const char* v = std::getenv("CATHOOK_ENABLE_UNSAFE_PACKET_TRANSLATION"))
         return v[0] != '\0' && v[0] != '0';
     return false;
 }();
@@ -56,7 +64,8 @@ static int hook_impl(int a1, int a2)
     log_before(a1, a2);
 
     // Translate class ID from server (x64) -> client (x86) before game processes packet
-    if (!g_disable && hooks::classid::IsReady() && a2)
+    // IMPORTANT: This is unsafe for engine baseline lookups and is disabled by default.
+    if (g_enable_unsafe && !g_disable_legacy && hooks::classid::IsReady() && a2)
     {
         // Try to auto-detect the classId field among common offsets seen in the logs/IDA
         // Candidates in bytes from base of second arg struct
@@ -115,8 +124,10 @@ static InitRoutine init([]() {
     g_detour.Init(addr, (void *) hook_impl);
     logging::Info("ParsePacketEntities: hook installed at 0x%p", (void *) addr);
 
-    if (g_disable)
+    if (g_disable_legacy)
         logging::Info("ParsePacketEntities: translation disabled via CATHOOK_DISABLE_CLASSID_TRANSLATION");
+    if (!g_enable_unsafe)
+        logging::Info("ParsePacketEntities: UNSAFE packet classid translation is OFF (enable with CATHOOK_ENABLE_UNSAFE_PACKET_TRANSLATION=1)");
 
     hooks::classid::Init();
 

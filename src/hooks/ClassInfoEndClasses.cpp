@@ -13,6 +13,11 @@ static std::vector<ClientClassInfo> g_latest;
 static std::unordered_map<std::string, int> g_name_to_id;
 static std::mutex g_mutex;
 static DetourHook g_detour;
+static bool g_enable_remap = [](){
+    if (const char* v = std::getenv("CATHOOK_ENABLE_CLASSLIST_REMAP"))
+        return v[0] != '\0' && v[0] != '0';
+    return false;
+}();
 
 using Target_t = int (*)(int);
 
@@ -46,6 +51,8 @@ static void write_dump(const char *phase, const std::vector<ClientClassInfo> &li
 
 static void remap_client_classes_by_name()
 {
+    if (!g_enable_remap)
+        return; // disabled by default; unsafe for some engines/mods
     if (!g_IBaseClient || !hooks::classid::IsReady())
         return;
     int remapped = 0, unknown = 0;
@@ -125,6 +132,9 @@ static InitRoutine init([]() {
 
     // Ensure class ID translator is initialized early
     hooks::classid::Init();
+
+    if (!g_enable_remap)
+        logging::Info("ClassInfoEndClasses: classlist remap is OFF (enable with CATHOOK_ENABLE_CLASSLIST_REMAP=1)");
 
     EC::Register(EC::Shutdown, []() {
         g_detour.Shutdown();
