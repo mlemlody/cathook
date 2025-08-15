@@ -22,9 +22,14 @@ static bool g_disable_legacy = [](){
     return false;
 }();
 static bool g_enable_unsafe = [](){
-    if (const char* v = std::getenv("CATHOOK_ENABLE_UNSAFE_PACKET_TRANSLATION"))
-        return v[0] != '\0' && v[0] != '0';
-    return false;
+    // Default: ON. Disable with CATHOOK_DISABLE_UNSAFE_PACKET_TRANSLATION=1 or CATHOOK_ENABLE_UNSAFE_PACKET_TRANSLATION=0
+    if (const char* vdis = std::getenv("CATHOOK_DISABLE_UNSAFE_PACKET_TRANSLATION")) {
+        if (vdis[0] != '\0' && vdis[0] != '0') return false;
+    }
+    if (const char* ven = std::getenv("CATHOOK_ENABLE_UNSAFE_PACKET_TRANSLATION")) {
+        return ven[0] != '\0' && ven[0] != '0';
+    }
+    return true;
 }();
 
 static void log_before(int a1, int a2)
@@ -126,7 +131,9 @@ static InitRoutine init([]() {
 
     if (g_disable_legacy)
         logging::Info("ParsePacketEntities: translation disabled via CATHOOK_DISABLE_CLASSID_TRANSLATION");
-    if (!g_enable_unsafe)
+    if (g_enable_unsafe)
+        logging::Info("ParsePacketEntities: UNSAFE packet classid translation is ON (disable with CATHOOK_DISABLE_UNSAFE_PACKET_TRANSLATION=1 or CATHOOK_ENABLE_UNSAFE_PACKET_TRANSLATION=0)");
+    else
         logging::Info("ParsePacketEntities: UNSAFE packet classid translation is OFF (enable with CATHOOK_ENABLE_UNSAFE_PACKET_TRANSLATION=1)");
 
     hooks::classid::Init();
