@@ -3,6 +3,11 @@
 #include <cstdio>
 #include <cstdint>
 #include <cstdlib>
+#include <string>
+#include <vector>
+#include <fstream>
+#include <sstream>
+#include <chrono>
 #include "hooks/ClassIdTranslator.hpp"
 
 // Hook CL_ParsePacketEntities (engine.so) to log state before parsing.
@@ -32,6 +37,64 @@ static bool g_enable_unsafe = [](){
     return true;
 }();
 
+#ifdef __linux__
+struct MapRegion { uintptr_t start, end; bool readable; bool writable; };
+static std::vector<MapRegion> g_maps;
+static uint64_t g_maps_last_refresh_ms = 0;
+
+static uint64_t now_ms()
+{
+    using namespace std::chrono;
+    return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+}
+
+static void refresh_maps_if_needed()
+{
+    const uint64_t t = now_ms();
+    if (!g_maps.empty() && (t - g_maps_last_refresh_ms) < 1000) return; // refresh at most once/sec
+    g_maps.clear();
+    std::ifstream f("/proc/self/maps");
+    std::string line;
+    while (std::getline(f, line))
+    {
+        unsigned long s=0, e=0; char perms[8] = {0};
+        if (std::sscanf(line.c_str(), "%lx-%lx %7s", &s, &e, perms) == 3)
+        {
+            MapRegion r{ (uintptr_t)s, (uintptr_t)e, perms[0] == 'r', perms[1] == 'w' };
+            g_maps.push_back(r);
+        }
+    }
+    g_maps_last_refresh_ms = t;
+}
+
+static bool is_readable(uintptr_t addr, size_t size)
+{
+    refresh_maps_if_needed();
+    const uintptr_t end = addr + size;
+    for (const auto& r : g_maps)
+    {
+        if (!r.readable) continue;
+        if (addr >= r.start && end <= r.end) return true;
+    }
+    return false;
+}
+
+static bool is_writable(uintptr_t addr, size_t size)
+{
+    refresh_maps_if_needed();
+    const uintptr_t end = addr + size;
+    for (const auto& r : g_maps)
+    {
+        if (!r.writable) continue;
+        if (addr >= r.start && end <= r.end) return true;
+    }
+    return false;
+}
+#else
+static bool is_readable(uintptr_t, size_t) { return true; }
+static bool is_writable(uintptr_t, size_t) { return true; }
+#endif
+
 static void log_before(int a1, int a2)
 {
     // Extract fields from the structure pointed by a2 (based on disassembly offsets)
@@ -47,11 +110,26 @@ static void log_before(int a1, int a2)
         // Basic plausibility guard: only read if a2 looks like a user-space pointer.
         uintptr_t base = static_cast<uintptr_t>(static_cast<uint32_t>(a2));
         if (base >= 0x10000u) {
-            v_a2 = *reinterpret_cast<int *>(a2 + 20);
-            v_a3 = *reinterpret_cast<int *>(a2 + 28);
-            v_a4 = *reinterpret_cast<int *>(a2 + 16);
-            v_a5 = *reinterpret_cast<int *>(a2 + 32);
-            v_a6 = *reinterpret_cast<int *>(a2 + 40);
+            // Only read fields if each address looks mapped and readable.
+            const uintptr_t a20 = base + 20;
+            const uintptr_t a28 = base + 28;
+            const uintptr_t a16 = base + 16;
+            const uintptr_t a32 = base + 32;
+            const uintptr_t a40 = base + 40;
+            if (is_readable(a20, sizeof(int)) && is_readable(a28, sizeof(int)) &&
+                is_readable(a16, sizeof(int)) && is_readable(a32, sizeof(int)) &&
+                is_readable(a40, sizeof(int)))
+            {
+                v_a2 = *reinterpret_cast<int *>(a2 + 20);
+                v_a3 = *reinterpret_cast<int *>(a2 + 28);
+                v_a4 = *reinterpret_cast<int *>(a2 + 16);
+                v_a5 = *reinterpret_cast<int *>(a2 + 32);
+                v_a6 = *reinterpret_cast<int *>(a2 + 40);
+            }
+            else
+            {
+                logging::Info("[CL_ParsePacketEntities] BEFORE: a2 fields not readable, skipping field reads (base=0x%p)", (void*) base);
+            }
         } else {
             logging::Info("[CL_ParsePacketEntities] BEFORE: a2 pointer 0x%p not plausible, skipping field reads", (void*) (uintptr_t) a2);
         }
@@ -87,16 +165,19 @@ static int hook_impl(int a1, int a2)
         else
         {
         // Try to auto-detect the classId field among common offsets seen in the logs/IDA
-        // Candidates in bytes from base of second arg struct
-        static const int kCandidates[] = { 16, 20, 24, 28, 32, 36, 40 };
+        // Be conservative: use most plausible offsets only to reduce false positives
+        static const int kCandidates[] = { 20, 28 };
         static int g_classIdOffset = -1; // memoized after detection
         static int g_confirmCounts[sizeof(kCandidates)/sizeof(kCandidates[0])] = {0};
         static bool g_logged_stabilized = false;
+        static const int kConfirmThreshold = 6;
 
         auto validate_offset = [&](int off, int& sid_out, int& cid_out, std::string& name_out) -> bool {
             // Re-check plausibility inside validator as well.
             uintptr_t base = static_cast<uintptr_t>(static_cast<uint32_t>(a2));
             if (base < 0x10000u) return false;
+            const uintptr_t addr = base + static_cast<uintptr_t>(off);
+            if (!is_readable(addr, sizeof(int))) return false;
             int* p = reinterpret_cast<int*>(a2 + off);
             if (!p) return false;
             int sid = *p;
@@ -118,9 +199,18 @@ static int hook_impl(int a1, int a2)
             int sid = -1, cid = -1; std::string nm;
             if (validate_offset(g_classIdOffset, sid, cid, nm) && cid != sid)
             {
-                int* p = reinterpret_cast<int*>(a2 + g_classIdOffset);
-                *p = cid;
-                logging::Info("[CL_ParsePacketEntities] Translated class ID at +%d: %d (%s) -> %d", g_classIdOffset, sid, nm.c_str(), cid);
+                uintptr_t base = static_cast<uintptr_t>(static_cast<uint32_t>(a2));
+                const uintptr_t addr = base + static_cast<uintptr_t>(g_classIdOffset);
+                if (is_writable(addr, sizeof(int)))
+                {
+                    int* p = reinterpret_cast<int*>(a2 + g_classIdOffset);
+                    *p = cid;
+                    logging::Info("[CL_ParsePacketEntities] Translated class ID at +%d: %d (%s) -> %d", g_classIdOffset, sid, nm.c_str(), cid);
+                }
+                else
+                {
+                    logging::Info("[CL_ParsePacketEntities] Skipping write: target +%d not writable (addr=0x%p)", g_classIdOffset, (void*) addr);
+                }
             }
         }
         else
@@ -135,7 +225,7 @@ static int hook_impl(int a1, int a2)
                     if (g_confirmCounts[idx] < 1000) ++g_confirmCounts[idx];
                     if (g_confirmCounts[idx] == 1)
                         logging::Info("[CL_ParsePacketEntities] Candidate class ID offset +%d looks valid (sid=%d name=%s -> cid=%d). Confirming...", off, sid, nm.c_str(), cid);
-                    if (g_confirmCounts[idx] >= 3)
+                    if (g_confirmCounts[idx] >= kConfirmThreshold)
                     {
                         g_classIdOffset = off;
                         logging::Info("[CL_ParsePacketEntities] Confirmed class ID offset at +%d after %d samples", off, g_confirmCounts[idx]);
