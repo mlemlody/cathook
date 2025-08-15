@@ -14,6 +14,8 @@ static std::unordered_map<std::string, int> g_serverNameToId;
 static std::unordered_map<std::string, int> g_clientNameToId;
 static bool g_ready = false;
 static int g_dummyClientId = -1;
+static const char* g_embeddedX64 = nullptr;
+static const char* g_embeddedX32 = nullptr;
 
 static bool parse_x32_line(const char* s, int& id, std::string& name) {
     // Format example: "[179] CTETFParticleEffect | DT_TETFParticleEffect"
@@ -31,6 +33,24 @@ static bool parse_x32_line(const char* s, int& id, std::string& name) {
     if (!bar) return false;
     name.assign(s, bar - s);
     return !name.empty();
+}
+
+static void try_load_memory(const char* text, bool is_x64, int max_lines = 200000) {
+    if (!text) return;
+    const char* s = text;
+    int line_no = 0;
+    while (*s && line_no < max_lines) {
+        const char* e = std::strchr(s, '\n');
+        std::string line;
+        if (e) { line.assign(s, e - s); s = e + 1; }
+        else { line.assign(s); s += line.size(); }
+        ++line_no;
+        int id = -1; std::string name;
+        bool ok = is_x64 ? parse_x64_line(line.c_str(), id, name) : parse_x32_line(line.c_str(), id, name);
+        if (!ok) continue;
+        if (is_x64) { g_serverIdToName[id] = name; g_serverNameToId[name] = id; }
+        else { g_clientIdToName[id] = name; g_clientNameToId[name] = id; }
+    }
 }
 
 static bool parse_x64_line(const char* s, int& id, std::string& name) {
@@ -88,13 +108,21 @@ static std::vector<std::string> candidate_paths(const char* fname) {
 
 void Init() {
     std::call_once(g_once, [](){
-        for (const auto& p : candidate_paths("x64parseclassinfo")) {
-            try_load_file(p.c_str(), /*is_x64=*/true);
-            if (!g_serverIdToName.empty()) break;
+        // Prefer embedded text if provided
+        if (g_embeddedX64) try_load_memory(g_embeddedX64, /*is_x64=*/true);
+        if (g_embeddedX32) try_load_memory(g_embeddedX32, /*is_x64=*/false);
+        // Fallback to filesystem if any map is still empty
+        if (g_serverIdToName.empty()) {
+            for (const auto& p : candidate_paths("x64parseclassinfo")) {
+                try_load_file(p.c_str(), /*is_x64=*/true);
+                if (!g_serverIdToName.empty()) break;
+            }
         }
-        for (const auto& p : candidate_paths("x32parseclassinfo")) {
-            try_load_file(p.c_str(), /*is_x64=*/false);
-            if (!g_clientIdToName.empty()) break;
+        if (g_clientIdToName.empty()) {
+            for (const auto& p : candidate_paths("x32parseclassinfo")) {
+                try_load_file(p.c_str(), /*is_x64=*/false);
+                if (!g_clientIdToName.empty()) break;
+            }
         }
         g_ready = !g_serverIdToName.empty() && !g_clientIdToName.empty();
         // compute dummy client id once
@@ -153,6 +181,11 @@ int ClientIdFromName(const std::string& name) {
     auto it = g_clientNameToId.find(name);
     if (it == g_clientNameToId.end()) return -1;
     return it->second;
+}
+
+void SetEmbeddedDumps(const char* x64_text, const char* x32_text) {
+    g_embeddedX64 = x64_text;
+    g_embeddedX32 = x32_text;
 }
 
 } // namespace hooks::classid
