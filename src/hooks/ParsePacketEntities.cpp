@@ -44,12 +44,17 @@ static void log_before(int a1, int a2)
 
     if (a2)
     {
-        // Use volatile reads to avoid UB with potential aliasing; still best-effort.
-        v_a2 = *reinterpret_cast<int *>(a2 + 20);
-        v_a3 = *reinterpret_cast<int *>(a2 + 28);
-        v_a4 = *reinterpret_cast<int *>(a2 + 16);
-        v_a5 = *reinterpret_cast<int *>(a2 + 32);
-        v_a6 = *reinterpret_cast<int *>(a2 + 40);
+        // Basic plausibility guard: only read if a2 looks like a user-space pointer.
+        uintptr_t base = static_cast<uintptr_t>(static_cast<uint32_t>(a2));
+        if (base >= 0x10000u) {
+            v_a2 = *reinterpret_cast<int *>(a2 + 20);
+            v_a3 = *reinterpret_cast<int *>(a2 + 28);
+            v_a4 = *reinterpret_cast<int *>(a2 + 16);
+            v_a5 = *reinterpret_cast<int *>(a2 + 32);
+            v_a6 = *reinterpret_cast<int *>(a2 + 40);
+        } else {
+            logging::Info("[CL_ParsePacketEntities] BEFORE: a2 pointer 0x%p not plausible, skipping field reads", (void*) (uintptr_t) a2);
+        }
     }
 
     // Print exactly as requested (pointer for a1, ints for others)
@@ -76,33 +81,61 @@ static int hook_impl(int a1, int a2)
         // Candidates in bytes from base of second arg struct
         static const int kCandidates[] = { 16, 20, 24, 28, 32, 36, 40 };
         static int g_classIdOffset = -1; // memoized after detection
+        static int g_confirmCounts[sizeof(kCandidates)/sizeof(kCandidates[0])] = {0};
+        static bool g_logged_stabilized = false;
 
-        auto try_translate_at = [&](int off) -> bool {
+        auto validate_offset = [&](int off, int& sid_out, int& cid_out, std::string& name_out) -> bool {
             int* p = reinterpret_cast<int*>(a2 + off);
             if (!p) return false;
             int sid = *p;
             if (sid < 0 || sid > 4096) return false; // sanity
-            // must resolve to a valid server name and a valid client id by name
             auto name = hooks::classid::NameFromServerId(sid);
+            if (name.empty()) return false;
             int cid = hooks::classid::TranslateServerToClient(sid);
-            if (!name.empty() && cid != sid)
-            {
-                *p = cid;
-                logging::Info("[CL_ParsePacketEntities] Translated class ID at +%d: %d (%s) -> %d", off, sid, name.c_str(), cid);
-                return true;
-            }
-            return false;
+            if (cid < 0 || cid > 4096) return false;
+            // Strong round-trip check: client->server must map back to same sid and names must match
+            if (hooks::classid::TranslateClientToServer(cid) != sid) return false;
+            auto cname = hooks::classid::NameFromClientId(cid);
+            if (cname != name) return false;
+            sid_out = sid; cid_out = cid; name_out = std::move(name);
+            return true;
         };
 
         if (g_classIdOffset >= 0)
         {
-            (void)try_translate_at(g_classIdOffset);
+            int sid = -1, cid = -1; std::string nm;
+            if (validate_offset(g_classIdOffset, sid, cid, nm) && cid != sid)
+            {
+                int* p = reinterpret_cast<int*>(a2 + g_classIdOffset);
+                *p = cid;
+                logging::Info("[CL_ParsePacketEntities] Translated class ID at +%d: %d (%s) -> %d", g_classIdOffset, sid, nm.c_str(), cid);
+            }
         }
         else
         {
+            // Detection phase: require multiple successful validations for the SAME offset
+            int idx = 0;
             for (int off : kCandidates)
             {
-                if (try_translate_at(off)) { g_classIdOffset = off; break; }
+                int sid = -1, cid = -1; std::string nm;
+                if (validate_offset(off, sid, cid, nm))
+                {
+                    if (g_confirmCounts[idx] < 1000) ++g_confirmCounts[idx];
+                    if (g_confirmCounts[idx] == 1)
+                        logging::Info("[CL_ParsePacketEntities] Candidate class ID offset +%d looks valid (sid=%d name=%s -> cid=%d). Confirming...", off, sid, nm.c_str(), cid);
+                    if (g_confirmCounts[idx] >= 3)
+                    {
+                        g_classIdOffset = off;
+                        logging::Info("[CL_ParsePacketEntities] Confirmed class ID offset at +%d after %d samples", off, g_confirmCounts[idx]);
+                        break;
+                    }
+                }
+                ++idx;
+            }
+            if (g_classIdOffset >= 0 && !g_logged_stabilized)
+            {
+                g_logged_stabilized = true;
+                logging::Info("[CL_ParsePacketEntities] Translation activated using offset +%d", g_classIdOffset);
             }
         }
     }
