@@ -62,24 +62,26 @@ static bool parse_x64_line(const char* s, int& id, std::string& name) {
     if (!s) return false;
     // Skip leading spaces
     while (*s == ' ' || *s == '\t') ++s;
-    if (*s == '[') {
-        // Reuse x32 parser for bracket lines
-        return parse_x32_line(s, id, name);
-    }
-    // Fallback to ID=/Name= format
+    // Prefer ID=/Name= format anywhere on the line (handles prefixes like "[AFTER]")
     const char* idp = std::strstr(s, "ID=");
     const char* namep = std::strstr(s, "Name=");
-    if (!idp || !namep) return false;
-    idp += 3; char* endptr = nullptr;
-    long val = std::strtol(idp, &endptr, 10);
-    if (endptr == idp) return false;
-    id = static_cast<int>(val);
-    namep += 5;
-    // name until space or end; but names have no spaces
-    const char* sp = namep;
-    while (*sp && *sp != ' ' && *sp != '\r' && *sp != '\n' && *sp != '\t') ++sp;
-    name.assign(namep, sp - namep);
-    return !name.empty();
+    if (idp && namep) {
+        idp += 3; char* endptr = nullptr;
+        long val = std::strtol(idp, &endptr, 10);
+        if (endptr == idp) return false;
+        id = static_cast<int>(val);
+        namep += 5;
+        // name until space or end; but names have no spaces
+        const char* sp = namep;
+        while (*sp && *sp != ' ' && *sp != '\r' && *sp != '\n' && *sp != '\t') ++sp;
+        name.assign(namep, sp - namep);
+        return !name.empty();
+    }
+    // Fallback: bracketed format at start of line
+    if (*s == '[') {
+        return parse_x32_line(s, id, name);
+    }
+    return false;
 }
 
 static void try_load_file(const char* path, bool is_x64, int max_lines = 200000) {
