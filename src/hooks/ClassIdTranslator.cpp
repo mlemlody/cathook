@@ -35,6 +35,8 @@ static bool parse_x32_line(const char* s, int& id, std::string& name) {
     return !name.empty();
 }
 
+static bool parse_x64_line(const char* s, int& id, std::string& name);
+
 static void try_load_memory(const char* text, bool is_x64, int max_lines = 200000) {
     if (!text) return;
     const char* s = text;
