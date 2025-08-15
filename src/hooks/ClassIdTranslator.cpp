@@ -84,6 +84,7 @@ static bool parse_x64_line(const char* s, int& id, std::string& name) {
 
 static void try_load_file(const char* path, bool is_x64, int max_lines = 200000) {
     if (!path) return;
+    size_t before = is_x64 ? g_serverIdToName.size() : g_clientIdToName.size();
     if (FILE* f = std::fopen(path, "rb")) {
         char line[2048];
         int line_no = 0;
@@ -101,6 +102,11 @@ static void try_load_file(const char* path, bool is_x64, int max_lines = 200000)
             }
         }
         std::fclose(f);
+        size_t after = is_x64 ? g_serverIdToName.size() : g_clientIdToName.size();
+        size_t added = after >= before ? (after - before) : 0;
+        logging::Info("ClassIdTranslator: parsed %zu %s entries from '%s'", added, is_x64?"server(x64)":"client(x86)", path);
+    } else {
+        logging::Info("ClassIdTranslator: failed to open '%s'", path);
     }
 }
 
@@ -110,6 +116,8 @@ static std::vector<std::string> candidate_paths(const char* fname) {
     paths.emplace_back(std::string("src/hooks/txt/") + fname);
     paths.emplace_back(std::string("./src/hooks/txt/") + fname);
     paths.emplace_back(std::string("../src/hooks/txt/") + fname);
+    // System-wide install location for client fix dumps
+    paths.emplace_back(std::string("/opt/cathook/clientfix/") + fname);
     // Allow override via env var CATHOOK_TXT_DIR
     if (const char* dir = std::getenv("CATHOOK_TXT_DIR")) {
         std::string p = dir; if (!p.empty() && p.back() != '/' && p.back() != '\\') p.push_back('/');
@@ -126,12 +134,14 @@ void Init() {
         // Fallback to filesystem if any map is still empty
         if (g_serverIdToName.empty()) {
             for (const auto& p : candidate_paths("x64parseclassinfo")) {
+                logging::Info("ClassIdTranslator: trying server dump path: %s", p.c_str());
                 try_load_file(p.c_str(), /*is_x64=*/true);
                 if (!g_serverIdToName.empty()) break;
             }
         }
         if (g_clientIdToName.empty()) {
             for (const auto& p : candidate_paths("x32parseclassinfo")) {
+                logging::Info("ClassIdTranslator: trying client dump path: %s", p.c_str());
                 try_load_file(p.c_str(), /*is_x64=*/false);
                 if (!g_clientIdToName.empty()) break;
             }
@@ -192,6 +202,12 @@ int GetDummyClientId() { return g_dummyClientId; }
 int ClientIdFromName(const std::string& name) {
     auto it = g_clientNameToId.find(name);
     if (it == g_clientNameToId.end()) return -1;
+    return it->second;
+}
+
+int ServerIdFromName(const std::string& name) {
+    auto it = g_serverNameToId.find(name);
+    if (it == g_serverNameToId.end()) return -1;
     return it->second;
 }
 
