@@ -358,7 +358,6 @@ free(logname);*/
     sharedobj::LoadEarlyObjects();
 
 // Fix locale issues caused by steam update
-#if ENABLE_TEXTMODE
     static BytePatch patch(gSignatures.GetEngineSignature, "74 ? 89 5C 24 ? 8D 9D ? ? ? ? 89 74 24", 0, { 0x71 });
     patch.Patch();
 
@@ -389,7 +388,6 @@ free(logname);*/
     // Remove intro video which also causes some crashes
     static BytePatch patch_intro_video(gSignatures.GetEngineSignature, "55 89 E5 57 56 53 83 EC 5C 8B 5D ? 8B 55", 0x9, { 0x83, 0xc4, 0x5c, 0x5b, 0x5e, 0x5f, 0x5d, 0xc3 });
     patch_intro_video.Patch();
-#endif
 
     CreateEarlyInterfaces();
 
