@@ -60,16 +60,15 @@ static void remap_client_classes_by_name()
     {
         const char* nm = cc->GetName();
         if (!nm || !*nm) continue;
-        // We want the SERVER (x64) class ID to align with server string tables
-        int want = hooks::classid::TranslateClientToServer(cc->m_ClassID);
-        if (want >= 0 && want != cc->m_ClassID)
+        int want = hooks::classid::ClientIdFromName(nm);
+        if (want >= 0)
         {
-            cc->m_ClassID = want; ++remapped;
+            if (cc->m_ClassID != want) { cc->m_ClassID = want; ++remapped; }
         }
-        else if (want < 0) { ++unknown; }
+        else { ++unknown; }
     }
     if (remapped || unknown)
-        logging::Info("ClassInfoEndClasses: remapped %d classes to SERVER IDs, unknown %d (left unchanged)", remapped, unknown);
+        logging::Info("ClassInfoEndClasses: remapped %d classes, unknown %d (left unchanged)", remapped, unknown);
 }
 
 static int hook_impl(int a1)
