@@ -77,15 +77,6 @@ static int hook_impl(int a1, int a2)
     // IMPORTANT: This is unsafe for engine baseline lookups and is disabled by default.
     if (g_enable_unsafe && !g_disable_legacy && hooks::classid::IsReady() && a2)
     {
-        // Only touch memory if a2 looks like a plausible userspace pointer.
-        uintptr_t a2_base = static_cast<uintptr_t>(static_cast<uint32_t>(a2));
-        if (a2_base < 0x10000u)
-        {
-            logging::Info("[CL_ParsePacketEntities] Skipping translation: a2 pointer 0x%p not plausible", (void*) a2_base);
-            // Proceed to call original below
-        }
-        else
-        {
         // Try to auto-detect the classId field among common offsets seen in the logs/IDA
         // Candidates in bytes from base of second arg struct
         static const int kCandidates[] = { 16, 20, 24, 28, 32, 36, 40 };
@@ -94,9 +85,6 @@ static int hook_impl(int a1, int a2)
         static bool g_logged_stabilized = false;
 
         auto validate_offset = [&](int off, int& sid_out, int& cid_out, std::string& name_out) -> bool {
-            // Re-check plausibility inside validator as well.
-            uintptr_t base = static_cast<uintptr_t>(static_cast<uint32_t>(a2));
-            if (base < 0x10000u) return false;
             int* p = reinterpret_cast<int*>(a2 + off);
             if (!p) return false;
             int sid = *p;
@@ -149,7 +137,6 @@ static int hook_impl(int a1, int a2)
                 g_logged_stabilized = true;
                 logging::Info("[CL_ParsePacketEntities] Translation activated using offset +%d", g_classIdOffset);
             }
-        }
         }
     }
 
