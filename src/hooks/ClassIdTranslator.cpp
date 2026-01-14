@@ -56,17 +56,7 @@ static void try_load_memory(const char* text, bool is_x64, int max_lines = 20000
 }
 
 static bool parse_x64_line(const char* s, int& id, std::string& name) {
-    // Support either
-    // 1) Bracket format: "[179] CSomeClass | DT_SomeTable"
-    // 2) Verbose format: "... ID=351 Name=CSomeClass RecvTable=..."
-    if (!s) return false;
-    // Skip leading spaces
-    while (*s == ' ' || *s == '\t') ++s;
-    if (*s == '[') {
-        // Reuse x32 parser for bracket lines
-        return parse_x32_line(s, id, name);
-    }
-    // Fallback to ID=/Name= format
+    // Format example: "[AFTER] ClientClass: ID=351 Name=CWeaponIFMSteadyCam RecvTable=DT_..."
     const char* idp = std::strstr(s, "ID=");
     const char* namep = std::strstr(s, "Name=");
     if (!idp || !namep) return false;

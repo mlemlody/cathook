@@ -2,7 +2,6 @@
 #include "DetourHook.hpp"
 #include <cstdio>
 #include <cstdint>
-#include <cstdlib>
 #include "hooks/ClassIdTranslator.hpp"
 
 // Hook CL_ParsePacketEntities (engine.so) to log state before parsing.
@@ -13,11 +12,6 @@ namespace hooks::packetentities
 {
 using Fn_t = int (*)(int, int);
 static DetourHook g_detour;
-static bool g_disable = [](){
-    if (const char* v = std::getenv("CATHOOK_DISABLE_CLASSID_TRANSLATION"))
-        return v[0] != '\0' && v[0] != '0';
-    return false;
-}();
 
 static void log_before(int a1, int a2)
 {
@@ -56,7 +50,7 @@ static int hook_impl(int a1, int a2)
     log_before(a1, a2);
 
     // Translate class ID from server (x64) -> client (x86) before game processes packet
-    if (!g_disable && hooks::classid::IsReady() && a2)
+    if (hooks::classid::IsReady() && a2)
     {
         // Try to auto-detect the classId field among common offsets seen in the logs/IDA
         // Candidates in bytes from base of second arg struct
@@ -114,9 +108,6 @@ static InitRoutine init([]() {
 
     g_detour.Init(addr, (void *) hook_impl);
     logging::Info("ParsePacketEntities: hook installed at 0x%p", (void *) addr);
-
-    if (g_disable)
-        logging::Info("ParsePacketEntities: translation disabled via CATHOOK_DISABLE_CLASSID_TRANSLATION");
 
     hooks::classid::Init();
 
