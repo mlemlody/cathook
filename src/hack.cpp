@@ -320,19 +320,16 @@ free(logname);*/
     static BytePatch patch(gSignatures.GetEngineSignature, "74 ? 89 5C 24 ? 8D 9D ? ? ? ? 89 74 24", 0, { 0x71 });
     patch.Patch();
     
+        unsigned int crc = 544230355;
+        uintptr_t g_SendTableCRC_ptrptr = gSignatures.GetEngineSignature("C7 05 ? ? ? ? ? ? ? ? A3 ? ? ? ? 83 C4") + 0x2;
 
-    unsigned int spoofed_crc = 544230355;
-    uintptr_t send_table_crc_ptrptr = gSignatures.GetEngineSignature("C7 05 ? ? ? ? ? ? ? ? A3 ? ? ? ? 83 C4") + 0x2;
+        BytePatch::mprotectAddr(g_SendTableCRC_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
+        BytePatch::mprotectAddr(*(uintptr_t *) g_SendTableCRC_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
+        BytePatch::mprotectAddr(**(uintptr_t **) g_SendTableCRC_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
 
-    BytePatch::mprotectAddr(send_table_crc_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
-    BytePatch::mprotectAddr(*(uintptr_t *) send_table_crc_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
-    BytePatch::mprotectAddr(**(uintptr_t **) send_table_crc_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
-
-    unsigned int *send_table_crc_ptr = *((unsigned int **) send_table_crc_ptrptr);
-    *send_table_crc_ptr = spoofed_crc;
-
-    static BytePatch crc_validation_bypass(gSignatures.GetEngineSignature, "74 ? 8B 03 89 1C 24 C7 44 24 ? ? ? ? ? FF 50 ? 83 C4", 0x0, { 0xEB });
-    crc_validation_bypass.Patch();
+        unsigned int *g_SendTableCRC_ptr = *((unsigned int **) g_SendTableCRC_ptrptr);
+        *g_SendTableCRC_ptr = crc;
+    
 
     // Remove intro video which also causes some crashes
     static BytePatch patch_intro_video(gSignatures.GetEngineSignature, "55 89 E5 57 56 53 83 EC 5C 8B 5D ? 8B 55", 0x9, { 0x83, 0xc4, 0x5c, 0x5b, 0x5e, 0x5f, 0x5d, 0xc3 });
