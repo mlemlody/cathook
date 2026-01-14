@@ -165,11 +165,8 @@ static void InitRandom()
         fclose(rnd);
 }
 
-static void SendClientInfo_Reference()
+void CBaseClientState::SendClientInfo( void )
 {
-    /*
-    This is the reference implementation of what CBaseClientState::SendClientInfo would do:
-    
     CLC_ClientInfo info;
     
     info.m_nSendTableCRC = SendTable_GetCRC();
@@ -204,7 +201,6 @@ static void SendClientInfo_Reference()
     }
 #endif // defined( REPLAY_ENABLED )
     m_NetChannel->SendNetMsg( info );
-    */
 }
 
 void hack::Hook()
