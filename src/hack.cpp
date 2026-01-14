@@ -379,7 +379,7 @@ free(logname);*/
     static auto Host_Error_hook = []() -> void {
         // dont
     };
-    host_error_detour.Init(host_error_addr, reinterpret_cast<void*>(+Host_Error_hook));
+    host_error_detour.Init(host_error_addr, (void*)Host_Error_hook);
 
     // class tables bypass
     unsigned int crc = 544230355;
