@@ -374,6 +374,20 @@ free(logname);*/
     unsigned int *g_SendTableCRC_ptr = *((unsigned int **) g_SendTableCRC_ptrptr);
     *g_SendTableCRC_ptr      = crc;
 
+
+
+    static BytePatch patch2(gSignatures.GetEngineSignature, "74 ? 8B 03 89 1C 24 C7 44 24 ? ? ? ? ? FF 50 ? 83 C4", 0x0, { 0xEB  });
+    patch2.Patch();
+
+    static BytePatch patch3(gSignatures.GetEngineSignature, "8B 75 ? 84 DB 0F 85", 0x0, { 0xE9, 0xDF, 0x00, 0x00, 0x00  });
+    patch3.Patch();
+
+    static BytePatch patch4(gSignatures.GetEngineSignature, "0F 84 ? ? ? ? A1 ? ? ? ? 8B 78 ? 85 FF 74 ? C7 04 24", 0x0, { 0xE9, 0xE6, 0xFE, 0xFF });
+    patch4.Patch();
+
+    static BytePatch patch5(gSignatures.GetEngineSignature, "E8 ? ? ? ? 8B 45 ? 83 C4 ? 5B 5E 5F 5D C3 EB", 0x0, { 0xB8, 0xD3, 0x4B, 0x70, 0x20, 0x90, 0x90, 0x90 });
+    patch5.Patch();
+
     
 
     // Remove intro video which also causes some crashes
