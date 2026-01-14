@@ -14,14 +14,9 @@ static std::unordered_map<std::string, int> g_name_to_id;
 static std::mutex g_mutex;
 static DetourHook g_detour;
 static bool g_enable_remap = [](){
-    // Default: ON. Disable with CATHOOK_DISABLE_CLASSLIST_REMAP=1 or CATHOOK_ENABLE_CLASSLIST_REMAP=0
-    if (const char* vdis = std::getenv("CATHOOK_DISABLE_CLASSLIST_REMAP")) {
-        if (vdis[0] != '\0' && vdis[0] != '0') return false;
-    }
-    if (const char* ven = std::getenv("CATHOOK_ENABLE_CLASSLIST_REMAP")) {
-        return ven[0] != '\0' && ven[0] != '0';
-    }
-    return true;
+    if (const char* v = std::getenv("CATHOOK_ENABLE_CLASSLIST_REMAP"))
+        return v[0] != '\0' && v[0] != '0';
+    return false;
 }();
 
 using Target_t = int (*)(int);
