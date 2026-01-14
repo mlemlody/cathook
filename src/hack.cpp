@@ -373,13 +373,7 @@ free(logname);*/
     
     static BytePatch patch_entity_check(gSignatures.GetEngineSignature, "74 ? 8B 40 ? 85 C0 74 ? 8B 10 8B 52", 0x0, { 0xEB });
     patch_entity_check.Patch();
-
-    static DetourHook host_error_detour;
-    static auto host_error_addr = gSignatures.GetEngineSignature("55 89 E5 53 81 EC 24 04 00 00");
-    static auto Host_Error_hook = []() -> void {
-        // dont
-    };
-    host_error_detour.Init(host_error_addr, (void*)Host_Error_hook);
+    
 
     // class tables bypass
     unsigned int crc = 544230355;
@@ -391,9 +385,6 @@ free(logname);*/
 
     unsigned int *g_SendTableCRC_ptr = *((unsigned int **) g_SendTableCRC_ptrptr);
     *g_SendTableCRC_ptr      = crc;
-
-
-    
 
     
 
