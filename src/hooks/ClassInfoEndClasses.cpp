@@ -92,7 +92,7 @@ static InitRoutine init([]() {
 
     if (!addr)
     {
-        logging::Info("ClassInfoEndClasses: engine signature not found; hook disabled");
+        logging::Warning("ClassInfoEndClasses: engine signature not found; hook disabled");
         return;
     }
 
