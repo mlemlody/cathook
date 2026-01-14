@@ -332,44 +332,6 @@ free(logname);*/
     unsigned int *g_SendTableCRC_ptr = *((unsigned int **) g_SendTableCRC_ptrptr);
     *g_SendTableCRC_ptr      = crc;
 
-    void CClientState::SendClientInfo( void )
-    {
-        CLC_ClientInfo info;
-        
-        info.m_nSendTableCRC = SendTable_GetCRC();
-        info.m_nServerCount = m_nServerCount;
-        info.m_bIsHLTV = false;
-    #if defined( REPLAY_ENABLED )
-        info.m_bIsReplay = false;
-    #endif
-    #if !defined( NO_STEAM )
-        info.m_nFriendsID = Steam3Client().SteamUser() ? Steam3Client().SteamUser()->GetSteamID().GetAccountID() : 0;
-    #else
-        info.m_nFriendsID = 0;
-    #endif
-        Q_strncpy( info.m_FriendsName, m_FriendsName, sizeof(info.m_FriendsName) );
-
-        CheckOwnCustomFiles(); // load & verfiy custom player files
-
-        for ( int i=0; i< MAX_CUSTOM_FILES; i++ )
-            info.m_nCustomFiles[i] = m_nCustomFiles[i].crc;
-
-        // Testing to ensure we don't blow up servers by faking our client info
-        if ( debug_clientstate_fake_hltv.GetBool() )
-        {
-            Msg( "!! Spoofing connect as HLTV in SendClientInfo\n" );
-            info.m_bIsHLTV = true;
-        }
-    #if defined( REPLAY_ENABLED )
-        if ( debug_clientstate_fake_replay.GetBool() )
-        {
-            Msg( "!! Spoofing connect as REPLAY in SendClientInfo\n" );
-            info.m_bIsReplay = true;
-        }
-    #endif // defined( REPLAY_ENABLED )
-        m_NetChannel->SendNetMsg( info );
-    }
-
     static BytePatch patch2(gSignatures.GetEngineSignature, "74 ? 8B 03 89 1C 24 C7 44 24 ? ? ? ? ? FF 50 ? 83 C4", 0x0, { 0xEB  });
     patch2.Patch();
 
