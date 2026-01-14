@@ -8,7 +8,6 @@
 #include <fstream>
 #include <sstream>
 #include <chrono>
-#include <cstring>
 #include "hooks/ClassIdTranslator.hpp"
 
 // Hook CL_ParsePacketEntities (engine.so) to log state before parsing.
@@ -24,20 +23,6 @@ static DetourHook g_detour;
 //  - CATHOOK_ENABLE_UNSAFE_PACKET_TRANSLATION: explicit opt-in to mutate packet data pre-parse.
 static bool g_disable_legacy = [](){
     if (const char* v = std::getenv("CATHOOK_DISABLE_CLASSID_TRANSLATION"))
-        return v[0] != '\0' && v[0] != '0';
-    return false;
-}();
-
-// Bypass everything and call original immediately (for isolation)
-static bool g_bypass_all = [](){
-    if (const char* v = std::getenv("CATHOOK_BYPASS_PARSEPACKETENTITIES"))
-        return v[0] != '\0' && v[0] != '0';
-    return false;
-}();
-
-// Disable BEFORE logging but keep hook active
-static bool g_disable_before_log = [](){
-    if (const char* v = std::getenv("CATHOOK_DISABLE_PACKETENTITIES_LOG"))
         return v[0] != '\0' && v[0] != '0';
     return false;
 }();
@@ -112,7 +97,6 @@ static bool is_writable(uintptr_t, size_t) { return true; }
 
 static void log_before(int a1, int a2)
 {
-    if (g_disable_before_log) return;
     // Extract fields from the structure pointed by a2 (based on disassembly offsets)
     // These map to the user's requested a2..a6 values for logging.
     int v_a2 = 0;   // *(a2 + 20)
@@ -136,12 +120,11 @@ static void log_before(int a1, int a2)
                 is_readable(a16, sizeof(int)) && is_readable(a32, sizeof(int)) &&
                 is_readable(a40, sizeof(int)))
             {
-                // Use uintptr_t-based addresses to avoid signed int overflow UB on (a2 + offset)
-                v_a2 = *reinterpret_cast<int *>(a20);
-                v_a3 = *reinterpret_cast<int *>(a28);
-                v_a4 = *reinterpret_cast<int *>(a16);
-                v_a5 = *reinterpret_cast<int *>(a32);
-                v_a6 = *reinterpret_cast<int *>(a40);
+                v_a2 = *reinterpret_cast<int *>(a2 + 20);
+                v_a3 = *reinterpret_cast<int *>(a2 + 28);
+                v_a4 = *reinterpret_cast<int *>(a2 + 16);
+                v_a5 = *reinterpret_cast<int *>(a2 + 32);
+                v_a6 = *reinterpret_cast<int *>(a2 + 40);
             }
             else
             {
@@ -166,14 +149,6 @@ static void log_before(int a1, int a2)
 
 static int hook_impl(int a1, int a2)
 {
-    if (g_bypass_all)
-    {
-        Fn_t orig = (Fn_t) g_detour.GetOriginalFunc();
-        int ret   = orig ? orig(a1, a2) : 0;
-        g_detour.RestorePatch();
-        return ret;
-    }
-
     log_before(a1, a2);
 
     // Translate class ID from server (x64) -> client (x86) before game processes packet
@@ -203,8 +178,7 @@ static int hook_impl(int a1, int a2)
             if (base < 0x10000u) return false;
             const uintptr_t addr = base + static_cast<uintptr_t>(off);
             if (!is_readable(addr, sizeof(int))) return false;
-            // Always dereference via the validated uintptr_t address, not (a2 + off)
-            int* p = reinterpret_cast<int*>(addr);
+            int* p = reinterpret_cast<int*>(a2 + off);
             if (!p) return false;
             int sid = *p;
             if (sid < 0 || sid > 4096) return false; // sanity
@@ -229,8 +203,7 @@ static int hook_impl(int a1, int a2)
                 const uintptr_t addr = base + static_cast<uintptr_t>(g_classIdOffset);
                 if (is_writable(addr, sizeof(int)))
                 {
-                    // Write via the validated uintptr_t address
-                    int* p = reinterpret_cast<int*>(addr);
+                    int* p = reinterpret_cast<int*>(a2 + g_classIdOffset);
                     *p = cid;
                     logging::Info("[CL_ParsePacketEntities] Translated class ID at +%d: %d (%s) -> %d", g_classIdOffset, sid, nm.c_str(), cid);
                 }
@@ -288,18 +261,6 @@ static InitRoutine init([]() {
         return;
     }
     uintptr_t addr = site;
-
-    // Log the first 16 bytes of the target prologue to validate the signature
-    {
-        unsigned char prolog[16] = {0};
-        std::memcpy(prolog, (void*)addr, sizeof(prolog));
-        logging::Info(
-            "ParsePacketEntities: prologue @0x%p = %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
-            (void*)addr,
-            prolog[0], prolog[1], prolog[2], prolog[3], prolog[4], prolog[5], prolog[6], prolog[7],
-            prolog[8], prolog[9], prolog[10], prolog[11], prolog[12], prolog[13], prolog[14], prolog[15]
-        );
-    }
 
     g_detour.Init(addr, (void *) hook_impl);
     logging::Info("ParsePacketEntities: hook installed at 0x%p", (void *) addr);
