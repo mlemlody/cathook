@@ -360,14 +360,36 @@ free(logname);*/
 // Fix locale issues caused by steam update
 #if ENABLE_TEXTMODE
     static BytePatch patch(gSignatures.GetEngineSignature, "74 ? 89 5C 24 ? 8D 9D ? ? ? ? 89 74 24", 0, { 0x71 });
-    patch.Patch();    
+    patch.Patch();
+
+    static BytePatch patch2(gSignatures.GetEngineSignature, "E8 ? ? ? ? 8B 45 ? 83 C4 ? 5B 5E 5F 5D C3 EB", 0x0, { 0xB8, 0xD3, 0x4B, 0x70, 0x20, 0x90, 0x90, 0x90 });
+    patch2.Patch();
+    
+    static BytePatch patch_copyentity(gSignatures.GetEngineSignature, "0F 84 ? ? ? ? 8B 45 ? 85 C0 0F 84 ? ? ? ? 8B 10", 0x0, { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 });
+    patch_copyentity.Patch();
+    
+    static BytePatch patch_entity_error(gSignatures.GetEngineSignature, "68 ? ? ? ? E8 ? ? ? ? 83 C4 ? 5B 5E 5F 5D C3", 0x0, { 0x83, 0xC4, 0x04, 0x5B, 0x5E, 0x5F, 0x5D, 0xC3 });
+    patch_entity_error.Patch();
+    
+    static BytePatch patch_entity_check(gSignatures.GetEngineSignature, "74 ? 8B 40 ? 85 C0 74 ? 8B 10 8B 52", 0x0, { 0xEB });
+    patch_entity_check.Patch();
+
+
+    // class tables bypass
+    unsigned int crc = 544230355;
+    uintptr_t g_SendTableCRC_ptrptr = gSignatures.GetEngineSignature("C7 05 ? ? ? ? ? ? ? ? A3 ? ? ? ? 83 C4") + 0x2;
+
+    BytePatch::mprotectAddr(g_SendTableCRC_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
+    BytePatch::mprotectAddr(*(uintptr_t *) g_SendTableCRC_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
+    BytePatch::mprotectAddr(**(uintptr_t **) g_SendTableCRC_ptrptr, 4, PROT_READ | PROT_WRITE | PROT_EXEC);
+
+    unsigned int *g_SendTableCRC_ptr = *((unsigned int **) g_SendTableCRC_ptrptr);
+    *g_SendTableCRC_ptr      = crc;
 
     // Remove intro video which also causes some crashes
     static BytePatch patch_intro_video(gSignatures.GetEngineSignature, "55 89 E5 57 56 53 83 EC 5C 8B 5D ? 8B 55", 0x9, { 0x83, 0xc4, 0x5c, 0x5b, 0x5e, 0x5f, 0x5d, 0xc3 });
     patch_intro_video.Patch();
 #endif
-
-
 
     CreateEarlyInterfaces();
 
