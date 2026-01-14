@@ -28,8 +28,6 @@ int TranslateClientToServer(int clientId);
 std::string NameFromServerId(int serverId);
 std::string NameFromClientId(int clientId);
 int ClientIdFromName(const std::string& name);
-// Lookup server (x64) ID from class name. Returns -1 if not found.
-int ServerIdFromName(const std::string& name);
 
 // For diagnostics
 const std::unordered_map<int, std::string>& GetServerIdToName();

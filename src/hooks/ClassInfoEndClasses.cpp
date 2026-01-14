@@ -53,7 +53,7 @@ static void remap_client_classes_by_name()
 {
     if (!g_enable_remap)
         return; // disabled by default; unsafe for some engines/mods
-    if (!g_IBaseClient)
+    if (!g_IBaseClient || !hooks::classid::IsReady())
         return;
     int remapped = 0, unknown = 0;
     for (auto cc = g_IBaseClient->GetAllClasses(); cc; cc = cc->m_pNext)
@@ -61,7 +61,7 @@ static void remap_client_classes_by_name()
         const char* nm = cc->GetName();
         if (!nm || !*nm) continue;
         // We want the SERVER (x64) class ID to align with server string tables
-        int want = hooks::classid::ServerIdFromName(nm);
+        int want = hooks::classid::TranslateClientToServer(cc->m_ClassID);
         if (want >= 0 && want != cc->m_ClassID)
         {
             cc->m_ClassID = want; ++remapped;
