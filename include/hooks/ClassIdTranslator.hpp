@@ -9,9 +9,6 @@ namespace hooks::classid
 // Initialize by parsing dumps under src/hooks/txt/{x32parseclassinfo,x64parseclassinfo}.
 // Safe to call multiple times; it will no-op after success.
 void Init();
-// Optional: set embedded dump contents (full text of the two files). If provided,
-// Init() will prefer parsing these over filesystem reads.
-void SetEmbeddedDumps(const char* x64_text, const char* x32_text);
 
 // Returns true if initialization parsed both maps.
 bool IsReady();

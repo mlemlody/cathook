@@ -24,24 +24,6 @@ set(files "${CMAKE_CURRENT_LIST_DIR}/CanPacket.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/ClassIdTranslator.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/ClassInfoEndClasses.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/ParsePacketEntities.cpp")
-
-# Generate EmbeddedClassInfo.cpp from txt dumps so the lists are compiled in
-set(_txt_dir "${CMAKE_CURRENT_LIST_DIR}/txt")
-set(_x32_txt "${_txt_dir}/x32parseclassinfo")
-set(_x64_txt "${_txt_dir}/x64parseclassinfo")
-set(_tpl     "${CMAKE_CURRENT_LIST_DIR}/EmbeddedClassInfo.tpl.cpp")
-set(_gen     "${CMAKE_CURRENT_BINARY_DIR}/EmbeddedClassInfo.cpp")
-
-if(EXISTS "${_x32_txt}" AND EXISTS "${_x64_txt}" AND EXISTS "${_tpl}")
-    file(READ "${_x32_txt}" X32_CONTENT)
-    file(READ "${_x64_txt}" X64_CONTENT)
-    # Configure the template with raw string literals
-    configure_file("${_tpl}" "${_gen}" @ONLY)
-    list(APPEND files "${_gen}")
-    message(STATUS "EmbeddedClassInfo.cpp generated from txt dumps")
-else()
-    message(WARNING "Embedded class info not generated: missing txt or template. Runtime file loading will be used.")
-endif()
 target_sources(cathook PRIVATE ${files})
 
 if(EnableVisuals)

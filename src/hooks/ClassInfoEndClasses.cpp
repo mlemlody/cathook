@@ -48,7 +48,8 @@ static void remap_client_classes_by_name()
 {
     if (!g_IBaseClient || !hooks::classid::IsReady())
         return;
-    int remapped = 0, unknown = 0;
+    int remapped = 0, dummied = 0;
+    const int dummy = hooks::classid::GetDummyClientId();
     for (auto cc = g_IBaseClient->GetAllClasses(); cc; cc = cc->m_pNext)
     {
         const char* nm = cc->GetName();
@@ -58,10 +59,13 @@ static void remap_client_classes_by_name()
         {
             if (cc->m_ClassID != want) { cc->m_ClassID = want; ++remapped; }
         }
-        else { ++unknown; }
+        else if (dummy >= 0)
+        {
+            if (cc->m_ClassID != dummy) { cc->m_ClassID = dummy; ++dummied; }
+        }
     }
-    if (remapped || unknown)
-        logging::Info("ClassInfoEndClasses: remapped %d classes, unknown %d (left unchanged)", remapped, unknown);
+    if (remapped || dummied)
+        logging::Info("ClassInfoEndClasses: remapped %d classes, dummy-applied %d", remapped, dummied);
 }
 
 static int hook_impl(int a1)

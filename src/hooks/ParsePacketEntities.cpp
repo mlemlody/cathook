@@ -71,6 +71,14 @@ static int hook_impl(int a1, int a2)
                 logging::Info("[CL_ParsePacketEntities] Translated class ID at +%d: %d (%s) -> %d", off, sid, name.c_str(), cid);
                 return true;
             }
+            // Unknown or unmapped: use dummy if available
+            int dummy = hooks::classid::GetDummyClientId();
+            if (dummy >= 0)
+            {
+                *p = dummy;
+                logging::Info("[CL_ParsePacketEntities] Replaced unknown class ID at +%d: %d (%s) -> dummy %d", off, sid, name.empty()?"<unknown>":name.c_str(), dummy);
+                return true;
+            }
             return false;
         };
 
