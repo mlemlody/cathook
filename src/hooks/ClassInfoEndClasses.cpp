@@ -1,7 +1,6 @@
 #include "common.hpp"
 #include "DetourHook.hpp"
 #include "hooks/ClassInfoEndClasses.hpp"
-#include "hooks/ClassIdTranslator.hpp"
 
 #include <mutex>
 #include <cstdio>
@@ -44,30 +43,6 @@ static void write_dump(const char *phase, const std::vector<ClientClassInfo> &li
     std::fclose(f);
 }
 
-static void remap_client_classes_by_name()
-{
-    if (!g_IBaseClient || !hooks::classid::IsReady())
-        return;
-    int remapped = 0, dummied = 0;
-    const int dummy = hooks::classid::GetDummyClientId();
-    for (auto cc = g_IBaseClient->GetAllClasses(); cc; cc = cc->m_pNext)
-    {
-        const char* nm = cc->GetName();
-        if (!nm || !*nm) continue;
-        int want = hooks::classid::ClientIdFromName(nm);
-        if (want >= 0)
-        {
-            if (cc->m_ClassID != want) { cc->m_ClassID = want; ++remapped; }
-        }
-        else if (dummy >= 0)
-        {
-            if (cc->m_ClassID != dummy) { cc->m_ClassID = dummy; ++dummied; }
-        }
-    }
-    if (remapped || dummied)
-        logging::Info("ClassInfoEndClasses: remapped %d classes, dummy-applied %d", remapped, dummied);
-}
-
 static int hook_impl(int a1)
 {
     // Take pre snapshot and write
@@ -79,9 +54,6 @@ static int hook_impl(int a1)
     Target_t orig = (Target_t) g_detour.GetOriginalFunc();
     int ret       = orig ? orig(a1) : 0;
     g_detour.RestorePatch();
-
-    // After engine built class table, remap IDs by name to x86 table (or dummy)
-    remap_client_classes_by_name();
 
     // Take post snapshot, publish, and write
     std::vector<ClientClassInfo> after;
@@ -126,9 +98,6 @@ static InitRoutine init([]() {
 
     g_detour.Init(addr, (void *) hook_impl);
     logging::Info("ClassInfoEndClasses: hook installed at 0x%p", (void *) addr);
-
-    // Ensure class ID translator is initialized early
-    hooks::classid::Init();
 
     EC::Register(EC::Shutdown, []() {
         g_detour.Shutdown();

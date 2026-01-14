@@ -2,7 +2,6 @@
 #include "DetourHook.hpp"
 #include <cstdio>
 #include <cstdint>
-#include "hooks/ClassIdTranslator.hpp"
 
 // Hook CL_ParsePacketEntities (engine.so) to log state before parsing.
 // Signature provided: "C7 04 24 ? ? ? ? E8"
@@ -49,52 +48,6 @@ static int hook_impl(int a1, int a2)
 {
     log_before(a1, a2);
 
-    // Translate class ID from server (x64) -> client (x86) before game processes packet
-    if (hooks::classid::IsReady() && a2)
-    {
-        // Try to auto-detect the classId field among common offsets seen in the logs/IDA
-        // Candidates in bytes from base of second arg struct
-        static const int kCandidates[] = { 16, 20, 24, 28, 32, 36, 40 };
-        static int g_classIdOffset = -1; // memoized after detection
-
-        auto try_translate_at = [&](int off) -> bool {
-            int* p = reinterpret_cast<int*>(a2 + off);
-            if (!p) return false;
-            int sid = *p;
-            if (sid < 0 || sid > 4096) return false; // sanity
-            // must resolve to a valid server name and a valid client id by name
-            auto name = hooks::classid::NameFromServerId(sid);
-            int cid = hooks::classid::TranslateServerToClient(sid);
-            if (!name.empty() && cid != sid)
-            {
-                *p = cid;
-                logging::Info("[CL_ParsePacketEntities] Translated class ID at +%d: %d (%s) -> %d", off, sid, name.c_str(), cid);
-                return true;
-            }
-            // Unknown or unmapped: use dummy if available
-            int dummy = hooks::classid::GetDummyClientId();
-            if (dummy >= 0)
-            {
-                *p = dummy;
-                logging::Info("[CL_ParsePacketEntities] Replaced unknown class ID at +%d: %d (%s) -> dummy %d", off, sid, name.empty()?"<unknown>":name.c_str(), dummy);
-                return true;
-            }
-            return false;
-        };
-
-        if (g_classIdOffset >= 0)
-        {
-            (void)try_translate_at(g_classIdOffset);
-        }
-        else
-        {
-            for (int off : kCandidates)
-            {
-                if (try_translate_at(off)) { g_classIdOffset = off; break; }
-            }
-        }
-    }
-
     // Call original and restore patch
     Fn_t orig = (Fn_t) g_detour.GetOriginalFunc();
     int ret   = orig ? orig(a1, a2) : 0;
@@ -116,8 +69,6 @@ static InitRoutine init([]() {
 
     g_detour.Init(addr, (void *) hook_impl);
     logging::Info("ParsePacketEntities: hook installed at 0x%p", (void *) addr);
-
-    hooks::classid::Init();
 
     EC::Register(EC::Shutdown, []() {
         g_detour.Shutdown();
