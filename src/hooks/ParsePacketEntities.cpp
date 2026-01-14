@@ -50,7 +50,7 @@ static InitRoutine init([]() {
     static uintptr_t addr = gSignatures.GetEngineSignature("C7 04 24 ? ? ? ? E8");
     if (!addr)
     {
-        logging::Info("ParsePacketEntities: engine signature not found; hook disabled");
+        logging::Warning("ParsePacketEntities: engine signature not found; hook disabled");
         return;
     }
     g_detour.Init(addr, (void *) hook_impl);
